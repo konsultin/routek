@@ -110,6 +110,11 @@ func NewRouter(cfg Config) (*router.Router, error) {
 		responder = NewResponder(false)
 	}
 
+	// Custom NotFound handler with JSON response
+	rt.NotFound = func(ctx *fasthttp.RequestCtx) {
+		responder.Error(ctx, fasthttp.StatusNotFound, CodeNotFound, "Not Found", nil)
+	}
+
 	for group, routes := range doc {
 		handlerTarget, ok := cfg.Handlers[group]
 		if !ok {
