@@ -104,6 +104,7 @@ func NewRouter(cfg Config) (*router.Router, error) {
 	}
 
 	rt := router.New()
+	rt.HandleMethodNotAllowed = false // Return 404 instead of 405 for method mismatches
 	responder := cfg.Responder
 	if responder == nil {
 		responder = NewResponder(false)
