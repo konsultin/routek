@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/fasthttp/router"
+	"github.com/go-konsultin/errk"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
 )
@@ -198,7 +199,9 @@ func buildHandler(target any, methodName string, responder *Responder) (fasthttp
 
 		return func(ctx *fasthttp.RequestCtx) {
 			if res := method.Call([]reflect.Value{reflect.ValueOf(ctx)}); len(res) == 1 && !res[0].IsNil() {
-				responder.Error(ctx, fasthttp.StatusInternalServerError, CodeInternalError, "internal server error", res[0].Interface().(error))
+				err := res[0].Interface().(error)
+				status := extractHTTPStatus(err)
+				responder.Error(ctx, status, CodeInternalError, "internal server error", err)
 			}
 		}, nil
 	case 2:
@@ -210,7 +213,9 @@ func buildHandler(target any, methodName string, responder *Responder) (fasthttp
 			res := method.Call([]reflect.Value{reflect.ValueOf(ctx)})
 			data := res[0].Interface()
 			if !res[1].IsNil() {
-				responder.Error(ctx, fasthttp.StatusInternalServerError, CodeInternalError, "internal server error", res[1].Interface().(error))
+				err := res[1].Interface().(error)
+				status := extractHTTPStatus(err)
+				responder.Error(ctx, status, CodeInternalError, "internal server error", err)
 				return
 			}
 
@@ -219,4 +224,16 @@ func buildHandler(target any, methodName string, responder *Responder) (fasthttp
 	default:
 		return nil, fmt.Errorf("handler %q must return either nothing or error", methodName)
 	}
+}
+
+// extractHTTPStatus extracts HTTP status code from errk.Error metadata.
+// Returns fasthttp.StatusInternalServerError if not found.
+func extractHTTPStatus(err error) int {
+	var errkErr *errk.Error
+	if errors.As(err, &errkErr) {
+		if status, ok := errkErr.Metadata()["http_status"].(int); ok {
+			return status
+		}
+	}
+	return fasthttp.StatusInternalServerError
 }
